@@ -380,6 +380,36 @@ subscribe((s) => {
   renderHistory();
 });
 
+// ============================================================ KEYBOARD SHORTCUTS
+document.addEventListener("keydown", (e) => {
+  // Skip when typing in an input/textarea
+  if (["INPUT", "TEXTAREA", "SELECT"].includes(e.target.tagName)) return;
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  if (k === " ") { e.preventDefault(); $("#fire-spin").click(); return; }
+  if (k === "p") { $("#fire-public").click(); return; }
+  if (k === "s") { $("#fire-secret").click(); return; }
+  if (k === "t") { $("#fire-targeted").click(); return; }
+  if (k === "e") { $("#eyes-toggle").click(); return; }
+  if (k === "d") { $("#dismiss-card").click(); return; }
+  if (k === "x") { $("#applause-trigger").click(); return; }
+  if (k === "b") { $("#show-scoreboard").click(); return; }
+  if (k === "a") { $("#show-album").click(); return; }
+  if (k === "?") { alert(KB_HELP); return; }
+});
+const KB_HELP = `Keyboard shortcuts
+─────────────────────
+SPACE   Random spin
+P       Fire PUBLIC
+S       Fire SECRET (eyes-closed)
+T       Fire TARGETED (eyes-closed)
+E       Toggle eyes-closed
+D       Dismiss current card
+X       Door-applause flash
+B       Show scoreboard
+A       Show album
+?       This help`;
+
 function syncConfigControls(s) {
   const w = s.wheelWeights || { public: 50, secret: 30, targeted: 20 };
   if (document.activeElement?.id !== "w-public")   $("#w-public").value = w.public;

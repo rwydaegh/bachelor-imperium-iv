@@ -47,6 +47,31 @@ the projector animates and shows the card.
 
 ---
 
+## Local demo mode (no Firebase needed)
+
+If `firebase-config.js` still has `REPLACE_ME` values, the app automatically
+falls back to **local-only sync** — two browser windows on the **same device**
+will sync via `BroadcastChannel` and `localStorage`. Useful for previewing
+the dashboard before doing the Firebase setup.
+
+This will NOT work cross-device (Z Fold ↔ laptop). For real use you need
+Firebase configured.
+
+## Keyboard shortcuts (operator)
+
+| Key | Action |
+|---|---|
+| `Space` | Random spin |
+| `P` | Fire PUBLIC |
+| `S` | Fire SECRET (staging) |
+| `T` | Fire TARGETED (staging) |
+| `E` | Toggle eyes-closed |
+| `D` | Dismiss current card |
+| `X` | Door-applause flash |
+| `B` | Show scoreboard |
+| `A` | Show album |
+| `?` | Show this help |
+
 ## Connectivity
 
 Firebase requires internet. Either:

@@ -1,25 +1,15 @@
-// Firebase Realtime DB sync layer. One game document at /game/main.
-// All state mutations go through writeState(). Subscribers get the full doc.
-
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import {
-  getDatabase, ref, onValue, set, update, get, child, onDisconnect,
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+// Real-time state sync. Two transports:
+//   1. Firebase Realtime Database (default for production)
+//   2. Local fallback: BroadcastChannel + localStorage (no internet, same device)
+//
+// The fallback activates automatically when firebase-config.js still has
+// REPLACE_ME values. That lets Robin preview the dashboard in two browser
+// windows on his laptop without setting up Firebase first.
 
 import { PLAYERS_DEFAULT } from "./cards.js";
 
-// EDIT THIS BLOCK with your Firebase project config (from console.firebase.google.com)
-export const FIREBASE_CONFIG = window.FIREBASE_CONFIG || {
-  apiKey: "REPLACE_ME",
-  authDomain: "REPLACE_ME.firebaseapp.com",
-  databaseURL: "https://REPLACE_ME-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "REPLACE_ME",
-};
-
-const app = initializeApp(FIREBASE_CONFIG);
-const db = getDatabase(app);
-const GAME_PATH = "game/main";
-const gameRef = ref(db, GAME_PATH);
+const cfg = window.FIREBASE_CONFIG || {};
+const FIREBASE_OK = cfg.apiKey && !String(cfg.apiKey).includes("REPLACE_ME");
 
 export function defaultState() {
   const players = {};
@@ -49,12 +39,28 @@ export function defaultState() {
   };
 }
 
-export function subscribe(cb) {
-  return onValue(gameRef, (snap) => {
+// ============================================================
+// FIREBASE TRANSPORT
+// ============================================================
+let fb = null;
+async function fbInit() {
+  if (fb) return fb;
+  const [{ initializeApp }, { getDatabase, ref, onValue, set, update, get }] = await Promise.all([
+    import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"),
+    import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js"),
+  ]);
+  const app = initializeApp(cfg);
+  const db = getDatabase(app);
+  fb = { db, ref, onValue, set, update, get, gameRef: ref(db, "game/main") };
+  return fb;
+}
+
+async function fbSubscribe(cb) {
+  const f = await fbInit();
+  return f.onValue(f.gameRef, (snap) => {
     const v = snap.val();
     if (!v) {
-      // First boot: seed.
-      set(gameRef, defaultState());
+      f.set(f.gameRef, defaultState());
       cb(defaultState());
     } else {
       cb(v);
@@ -62,36 +68,134 @@ export function subscribe(cb) {
   });
 }
 
-export async function writeState(patch) {
-  return update(gameRef, { ...patch, lastUpdate: Date.now() });
+async function fbWriteState(patch) {
+  const f = await fbInit();
+  return f.update(f.gameRef, { ...patch, lastUpdate: Date.now() });
 }
 
-export async function writePlayer(playerId, patch) {
-  return update(ref(db, `${GAME_PATH}/players/${playerId}`), patch);
+async function fbWritePlayer(playerId, patch) {
+  const f = await fbInit();
+  return f.update(f.ref(f.db, `game/main/players/${playerId}`), patch);
 }
 
-export async function getStateOnce() {
-  const snap = await get(gameRef);
+async function fbGetState() {
+  const f = await fbInit();
+  const snap = await f.get(f.gameRef);
   return snap.val();
 }
 
-export async function resetAll() {
-  return set(gameRef, defaultState());
+async function fbReplaceAll(s) {
+  const f = await fbInit();
+  return f.set(f.gameRef, s);
 }
 
-export async function resetScoresOnly() {
-  const snap = await get(gameRef);
-  const v = snap.val();
-  if (!v) return;
-  const players = {};
-  for (const id of Object.keys(v.players || {})) {
-    players[id] = { ...v.players[id], score: 0, forbiddenWords: 0, phubben: 0, freePassUsed: false };
+async function fbWatchConn(cb) {
+  const f = await fbInit();
+  const cRef = f.ref(f.db, ".info/connected");
+  return f.onValue(cRef, (snap) => cb(!!snap.val()));
+}
+
+// ============================================================
+// LOCAL TRANSPORT (BroadcastChannel + localStorage)
+// ============================================================
+const LS_KEY = "bachelor-imperium-iv-state";
+const channel = (typeof BroadcastChannel !== "undefined")
+  ? new BroadcastChannel("bachelor-imperium-iv")
+  : null;
+let localSubs = [];
+
+function lsRead() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) { return null; }
+}
+function lsWrite(s) {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(s)); } catch (_) {}
+}
+
+function localBroadcast(state) {
+  for (const cb of localSubs) {
+    try { cb(state); } catch (_) {}
   }
-  return update(gameRef, { players });
+  if (channel) channel.postMessage({ kind: "state", state });
 }
 
-// Connection status: emit a "connected" boolean to a callback.
-export function watchConnection(cb) {
-  const cRef = ref(db, ".info/connected");
-  return onValue(cRef, (snap) => cb(!!snap.val()));
+if (channel) {
+  channel.onmessage = (ev) => {
+    if (ev.data?.kind === "state") {
+      lsWrite(ev.data.state);
+      for (const cb of localSubs) {
+        try { cb(ev.data.state); } catch (_) {}
+      }
+    }
+  };
 }
+window.addEventListener("storage", (e) => {
+  if (e.key === LS_KEY && e.newValue) {
+    try {
+      const s = JSON.parse(e.newValue);
+      for (const cb of localSubs) cb(s);
+    } catch (_) {}
+  }
+});
+
+function localSubscribe(cb) {
+  localSubs.push(cb);
+  let s = lsRead();
+  if (!s) { s = defaultState(); lsWrite(s); }
+  cb(s);
+  return () => { localSubs = localSubs.filter((x) => x !== cb); };
+}
+function localWriteState(patch) {
+  const s = { ...(lsRead() || defaultState()), ...patch, lastUpdate: Date.now() };
+  lsWrite(s); localBroadcast(s);
+  return Promise.resolve();
+}
+function localWritePlayer(id, patch) {
+  const s = lsRead() || defaultState();
+  s.players = s.players || {};
+  s.players[id] = { ...s.players[id], ...patch };
+  s.lastUpdate = Date.now();
+  lsWrite(s); localBroadcast(s);
+  return Promise.resolve();
+}
+function localGetState() { return Promise.resolve(lsRead()); }
+function localReplaceAll(s) { lsWrite(s); localBroadcast(s); return Promise.resolve(); }
+function localWatchConn(cb) { cb(true); return () => {}; }
+
+// ============================================================
+// PUBLIC API (transport-agnostic)
+// ============================================================
+export const TRANSPORT = FIREBASE_OK ? "firebase" : "local";
+
+export function subscribe(cb) {
+  return FIREBASE_OK ? fbSubscribe(cb) : localSubscribe(cb);
+}
+export function writeState(patch) {
+  return FIREBASE_OK ? fbWriteState(patch) : localWriteState(patch);
+}
+export function writePlayer(id, patch) {
+  return FIREBASE_OK ? fbWritePlayer(id, patch) : localWritePlayer(id, patch);
+}
+export function getStateOnce() {
+  return FIREBASE_OK ? fbGetState() : localGetState();
+}
+export async function resetAll() {
+  return FIREBASE_OK ? fbReplaceAll(defaultState()) : localReplaceAll(defaultState());
+}
+export async function resetScoresOnly() {
+  const s = await getStateOnce();
+  if (!s) return;
+  const players = {};
+  for (const id of Object.keys(s.players || {})) {
+    players[id] = { ...s.players[id], score: 0, forbiddenWords: 0, phubben: 0, freePassUsed: false };
+  }
+  return writeState({ players });
+}
+export function watchConnection(cb) {
+  return FIREBASE_OK ? fbWatchConn(cb) : localWatchConn(cb);
+}
+
+// Diagnostic: log mode on first import
+console.info(`[state] sync transport: ${TRANSPORT}${FIREBASE_OK ? "" : " (local-only — Firebase not configured)"}`);
