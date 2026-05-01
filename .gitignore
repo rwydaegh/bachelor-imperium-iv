@@ -9,3 +9,6 @@ Thumbs.db
 .idea/
 node_modules/
 bash.exe.stackdump
+package-lock.json
+package.json
+screenshots/
