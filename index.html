@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>🛸 Bachelor Imperium IV</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛸</text></svg>">
+  <link rel="stylesheet" href="css/style.css">
+  <script>window.FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;</script>
+  <script src="firebase-config.js" defer></script>
+</head>
+<body class="projector-body">
+  <div id="conn-badge" class="conn-badge hidden">🔌 reconnecting…</div>
+
+  <!-- Photo album backdrop -->
+  <div id="album" class="album"></div>
+
+  <!-- Idle scoreboard -->
+  <main id="scoreboard" class="screen scoreboard">
+    <h1 class="game-title">🛸 BACHELOR IMPERIUM IV 🛸</h1>
+    <div id="player-grid" class="player-grid"></div>
+    <div class="bottom-strip">
+      <div class="strip-block">
+        <span class="strip-label">FORBIDDEN</span>
+        <span id="forbidden-strip"></span>
+      </div>
+      <div class="strip-block">
+        <span class="strip-label">ACTIVE LAWS</span>
+        <span id="laws-strip"></span>
+      </div>
+    </div>
+  </main>
+
+  <!-- Wheel spin overlay -->
+  <div id="wheel-screen" class="screen wheel-screen hidden">
+    <div class="wheel-container">
+      <div class="wheel-pointer">▼</div>
+      <div id="wheel" class="wheel">
+        <div class="wheel-slice slice-public">PUBLIC</div>
+        <div class="wheel-slice slice-secret">SECRET</div>
+        <div class="wheel-slice slice-targeted">TARGETED</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card display -->
+  <div id="card-screen" class="screen card-screen hidden">
+    <div id="card-frame" class="card-frame">
+      <img id="card-image" class="card-image" alt="">
+      <div id="card-fallback" class="card-fallback hidden">
+        <div class="card-header" id="card-header"></div>
+        <h2 class="card-title" id="card-title"></h2>
+        <p class="card-body" id="card-body"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Eyes closed mode -->
+  <div id="eyes-closed" class="screen eyes-closed hidden">
+    <div class="eyes-banner">👁  EYES  CLOSED  👁</div>
+    <div id="eyes-card" class="eyes-card"></div>
+  </div>
+
+  <!-- Door applause flash -->
+  <div id="applause-flash" class="screen applause-flash hidden">
+    <div class="applause-emoji">👏</div>
+  </div>
+
+  <!-- Winner -->
+  <div id="winner-screen" class="screen winner-screen hidden">
+    <h1 class="winner-title">🏆  GALACTIC CHAMPION  🏆</h1>
+    <div id="winner-podium" class="winner-podium"></div>
+    <div id="confetti" class="confetti"></div>
+  </div>
+
+  <audio id="sfx-bell" src="sounds/bell.mp3" preload="auto"></audio>
+  <audio id="sfx-drumroll" src="sounds/drumroll.mp3" preload="auto"></audio>
+  <audio id="sfx-applause" src="sounds/applause.mp3" preload="auto"></audio>
+
+  <script type="module" src="js/projector.js"></script>
+</body>
+</html>

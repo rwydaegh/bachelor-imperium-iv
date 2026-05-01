@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>🎛 Operator — Bachelor Imperium IV</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎛</text></svg>">
+  <link rel="stylesheet" href="css/style.css">
+  <script>window.FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;</script>
+  <script src="firebase-config.js" defer></script>
+</head>
+<body class="operator-body">
+  <header class="op-header">
+    <h1>🎛 Operator Console</h1>
+    <div class="op-meta">
+      <span id="conn-dot" class="conn-dot">●</span>
+      <span id="projector-mode-label">scoreboard</span>
+    </div>
+  </header>
+
+  <main class="op-main">
+
+    <!-- A. FIRE -->
+    <section class="op-section fire">
+      <h2>Fire</h2>
+      <div class="fire-row">
+        <button class="fire-btn fire-public"   id="fire-public">PUBLIC</button>
+        <button class="fire-btn fire-secret"   id="fire-secret">SECRET</button>
+        <button class="fire-btn fire-targeted" id="fire-targeted">TARGETED</button>
+        <button class="fire-btn fire-spin"     id="fire-spin">🎲 SPIN</button>
+      </div>
+      <div class="fire-row secondary">
+        <button id="dismiss-card">✋ Dismiss</button>
+        <button id="pin-card">📌 Pin</button>
+        <button id="eyes-toggle">👁 Eyes Closed</button>
+        <button id="applause-trigger">👏 Door Applause</button>
+        <button id="show-album">🖼 Album</button>
+        <button id="show-scoreboard">📊 Scoreboard</button>
+      </div>
+    </section>
+
+    <!-- Eyes-closed staging (shown when a SECRET/TARGETED is drawn but not yet projected) -->
+    <section id="staging" class="op-section staging hidden">
+      <h2>Pending reveal</h2>
+      <div id="staging-content"></div>
+      <div class="staging-actions">
+        <button class="primary" id="project-eyes">🟢 PROJECT EYES-CLOSED REVEAL</button>
+        <button id="cancel-staging">Cancel</button>
+      </div>
+    </section>
+
+    <!-- B. CARD BROWSER -->
+    <section class="op-section browser">
+      <h2>Card browser</h2>
+      <div class="browser-tabs">
+        <button class="tab active" data-tab="law">Laws</button>
+        <button class="tab" data-tab="directive">Directives</button>
+        <button class="tab" data-tab="secret">Secrets</button>
+        <button class="tab" data-tab="targeted">Targeted</button>
+      </div>
+      <div id="browser-grid" class="browser-grid"></div>
+    </section>
+
+    <!-- C. SCOREBOARD EDITOR -->
+    <section class="op-section editor">
+      <h2>Scoreboard editor</h2>
+      <table class="editor-table">
+        <thead>
+          <tr><th>Player</th><th>Present</th><th>Score</th><th>Forbidden</th><th>Phubben</th><th>Free pass</th></tr>
+        </thead>
+        <tbody id="editor-tbody"></tbody>
+      </table>
+    </section>
+
+    <!-- D. ACTIVE LAWS -->
+    <section class="op-section laws">
+      <h2>Active laws</h2>
+      <ul id="laws-list" class="laws-list"></ul>
+      <div class="laws-add">
+        <select id="add-law-select"><option value="">Add a law…</option></select>
+        <button id="add-law-btn">Add</button>
+      </div>
+    </section>
+
+    <!-- E. FORBIDDEN WORDS -->
+    <section class="op-section forbidden">
+      <h2>Forbidden words</h2>
+      <div id="forbidden-chips" class="chips"></div>
+      <form id="add-forbidden-form" class="forbidden-add">
+        <input id="add-forbidden-input" type="text" placeholder="Add word…" maxlength="40">
+        <button type="submit">+</button>
+      </form>
+    </section>
+
+    <!-- F. WHEEL & DISPLAY CONFIG -->
+    <section class="op-section config">
+      <h2>Wheel & display</h2>
+      <label>Public weight: <input type="range" min="0" max="100" id="w-public"> <span id="w-public-v">50</span>%</label>
+      <label>Secret weight: <input type="range" min="0" max="100" id="w-secret"> <span id="w-secret-v">30</span>%</label>
+      <label>Targeted weight: <input type="range" min="0" max="100" id="w-targeted"> <span id="w-targeted-v">20</span>%</label>
+      <label>Card duration: <input type="range" min="5" max="60" id="card-dur"> <span id="card-dur-v">12</span>s</label>
+      <label><input type="checkbox" id="wheel-anim"> Wheel animation on fire</label>
+      <label><input type="checkbox" id="sfx-on" checked> Sound effects</label>
+    </section>
+
+    <!-- G. TARGETED HISTORY -->
+    <section class="op-section history">
+      <h2>Targeted history</h2>
+      <ul id="history-list" class="history-list"></ul>
+    </section>
+
+    <!-- H. BRIEFING HELPER -->
+    <section class="op-section briefing">
+      <h2>Friday briefing helper</h2>
+      <ol class="briefing-steps">
+        <li><button data-brief="forbidden">1. Project Forbidden Words list</button></li>
+        <li><button data-brief="door">2. Project Door Applause card</button></li>
+        <li><button data-brief="phubben">3. Project No Phubben card</button></li>
+        <li><button data-brief="rehearse">4. Rehearse Eyes-Closed</button></li>
+      </ol>
+    </section>
+
+    <!-- I. WINNER REVEAL -->
+    <section class="op-section winner">
+      <h2>Sunday final reveal</h2>
+      <button id="crown-winner" class="crown-btn">🏆 CROWN THE WINNER</button>
+    </section>
+
+    <!-- J. RESET / EXPORT -->
+    <section class="op-section meta">
+      <h2>Meta</h2>
+      <button id="reset-scores">↺ Reset scores</button>
+      <button id="reset-all">⚠ Reset everything</button>
+      <button id="export-json">💾 Export state</button>
+    </section>
+
+  </main>
+
+  <script type="module" src="js/operator.js"></script>
+</body>
+</html>

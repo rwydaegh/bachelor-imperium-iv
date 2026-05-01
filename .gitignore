@@ -1,0 +1,10 @@
+# Optional: if you'd rather not commit personal photos
+# photos/*.jpg
+# photos/*.png
+
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/
+node_modules/
