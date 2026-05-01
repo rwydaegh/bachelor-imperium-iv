@@ -16,15 +16,71 @@ let pendingReveal = null; // { card, substitutions: {TARGET, WORD,...} }
 $("#fire-public").addEventListener("click", () => firePile("public"));
 $("#fire-secret").addEventListener("click", () => firePile("secret"));
 $("#fire-targeted").addEventListener("click", () => firePile("targeted"));
-$("#fire-spin").addEventListener("click", () => {
+$("#fire-spin").addEventListener("click", async () => {
   const w = state?.wheelWeights || { public: 50, secret: 30, targeted: 20 };
   const total = (w.public || 0) + (w.secret || 0) + (w.targeted || 0);
-  if (total === 0) return firePile("public");
-  let r = Math.random() * total;
-  if ((r -= w.public) <= 0) return firePile("public");
-  if ((r -= w.secret) <= 0) return firePile("secret");
-  return firePile("targeted");
+  let slice = "public";
+  if (total > 0) {
+    let r = Math.random() * total;
+    if      ((r -= w.public)   <= 0) slice = "public";
+    else if ((r -= w.secret)   <= 0) slice = "secret";
+    else                              slice = "targeted";
+  }
+  // Pick the actual card now, then play the wheel landing on that slice,
+  // then route to card-display or eyes-closed staging.
+  let pile;
+  if (slice === "public") pile = publicPile();
+  else pile = cardsByType(slice);
+  const recent = (state?.recentDraws || []).slice(-5).map((d) => d.cardId);
+  const card = pickWeighted(pile, recent);
+  await spinThenDispatch(card, slice);
 });
+
+// Spin the wheel landing on the given slice, then dispatch the card to the
+// appropriate follow-up screen (card display for PUBLIC, staging for the
+// hidden categories). Bypasses the per-card wheel-skip in fireCard().
+async function spinThenDispatch(card, slice) {
+  // Push wheel-spin state with the card so projector knows which slice to land on
+  await writeState({
+    currentCard: { ...card },
+    projectorMode: "wheel_spin",
+    cardPinned: false,
+    recentDraws: [...(state?.recentDraws || []), { ts: Date.now(), type: card.type, cardId: card.id }].slice(-30),
+  });
+  await sleep(6000); // matches WHEEL_TOTAL in projector.js
+  // After wheel lands, route per category
+  if (card.type === "secret" || card.type === "targeted") {
+    pendingReveal = { card, substitutions: {} };
+    showStaging();
+    // Drop projector back to scoreboard while operator stages — wheel screen no longer relevant
+    await writeState({ projectorMode: "scoreboard" });
+  } else {
+    await projectCardNoWheel(card);
+  }
+}
+
+// Project a card immediately without playing the wheel (used after spin
+// already played, or for direct browser-pick of a card during operator manual).
+async function projectCardNoWheel(card) {
+  await writeState({
+    currentCard: { ...card },
+    projectorMode: "card",
+    cardPinned: false,
+  });
+  const dur = (state?.cardDurationSec || 12) * 1000;
+  setTimeout(async () => {
+    const cur = await getStateOnce();
+    if (cur?.projectorMode === "card" && !cur.cardPinned && cur.currentCard?.id === card.id) {
+      await writeState({ projectorMode: "scoreboard", currentCard: null });
+    }
+  }, dur);
+  if (card.type === "law" && card.id !== "law_repeal" && card.id !== "law_add_forbidden_word") {
+    const laws = state?.activeLaws || [];
+    if (!laws.some((l) => l.id === card.id)) {
+      await writeState({ activeLaws: [...laws, { id: card.id, title: card.title, source: "wheel" }] });
+    }
+  }
+}
 
 async function firePile(slice) {
   // slice: "public" | "secret" | "targeted"
