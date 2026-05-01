@@ -200,6 +200,13 @@ const WHEEL_TIMING = {
 };
 const WHEEL_TOTAL = WHEEL_TIMING.anticipate + WHEEL_TIMING.spin + WHEEL_TIMING.settle + 200;
 
+function setRotorRotation(rotor, deg, transitionMs, easing) {
+  rotor.style.transition = transitionMs > 0
+    ? `transform ${transitionMs}ms ${easing || "ease-out"}`
+    : "none";
+  rotor.style.transform = `rotate(${deg}deg)`;
+}
+
 function spinWheel(landingType) {
   if (spinning) return;
   spinning = true;
@@ -209,54 +216,39 @@ function spinWheel(landingType) {
   const glow = document.getElementById("wheel-glow");
   const sectorOf = { law: "public", directive: "public", secret: "secret", targeted: "targeted" };
   const sector = sectorOf[landingType] || "public";
-  // Sector centers (degrees on the wheel itself, 0 = top, clockwise):
-  // PUBLIC at 60°, SECRET at 180°, TARGETED at 300°
   const sectorCenter = { public: 60, secret: 180, targeted: 300 }[sector];
-  // To bring a wheel-degree X to the top (under the pointer at 0°), rotate by (360 - X)
-  const turns = 8; // more rotations = more drama
+  const turns = 8;
   const finalDeg = 360 * turns + (360 - sectorCenter);
-  // Overshoot then settle: spin slightly past, then back
   const overshoot = finalDeg + 8;
 
-  // Reset
-  rotor.classList.remove("anticipating", "spinning", "settling");
-  rotor.style.transition = "none";
-  rotor.style.transform = "rotate(0deg)";
+  // Reset to 0
+  setRotorRotation(rotor, 0, 0);
   glow.classList.add("hidden");
   glow.classList.remove("public-win", "secret-win", "targeted-win");
-  void rotor.offsetWidth; // reflow
+  void rotor.getBoundingClientRect();
 
   // Stage 1: anticipation
-  rotor.classList.add("anticipating");
-  rotor.style.transform = "rotate(-12deg)";
+  setRotorRotation(rotor, -12, WHEEL_TIMING.anticipate, "cubic-bezier(.34,1.56,.64,1)");
 
   setTimeout(() => {
-    // Stage 2: main spin to overshoot position
-    rotor.classList.remove("anticipating");
-    rotor.classList.add("spinning");
-    rotor.style.transition = `transform ${WHEEL_TIMING.spin}ms cubic-bezier(.10,.62,.20,1.0)`;
-    rotor.style.transform = `rotate(${overshoot}deg)`;
+    // Stage 2: main spin
+    setRotorRotation(rotor, overshoot, WHEEL_TIMING.spin, "cubic-bezier(.10,.62,.20,1.0)");
     playSfx("sfx-drumroll");
   }, WHEEL_TIMING.anticipate);
 
   setTimeout(() => {
-    // Stage 3: settle back to exact target with bounce
-    rotor.classList.remove("spinning");
-    rotor.classList.add("settling");
-    rotor.style.transition = `transform ${WHEEL_TIMING.settle}ms cubic-bezier(.34,1.56,.64,1)`;
-    rotor.style.transform = `rotate(${finalDeg}deg)`;
+    // Stage 3: settle bounce
+    setRotorRotation(rotor, finalDeg, WHEEL_TIMING.settle, "cubic-bezier(.34,1.56,.64,1)");
     playSfx("sfx-bell");
   }, WHEEL_TIMING.anticipate + WHEEL_TIMING.spin);
 
   setTimeout(() => {
-    // Stage 4: winning-sector glow
+    // Stage 4: glow
     glow.classList.remove("hidden");
     glow.classList.add(`${sector}-win`);
   }, WHEEL_TIMING.anticipate + WHEEL_TIMING.spin + WHEEL_TIMING.settle);
 
-  setTimeout(() => {
-    spinning = false;
-  }, WHEEL_TOTAL);
+  setTimeout(() => { spinning = false; }, WHEEL_TOTAL);
 }
 
 function renderWinner(state) {

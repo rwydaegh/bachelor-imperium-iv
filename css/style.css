@@ -146,25 +146,13 @@ html, body {
   overflow: visible;
 }
 
+/* The .wheel-rotor's rotation is driven by SVG transform attribute (set in JS).
+   We use CSS transition on the SVG transform property for the easing.
+   `transform-box: view-box` + `transform-origin: 0 0` ensures consistent
+   rotation around the SVG (0,0) point across browsers. */
 .wheel-rotor {
-  transform-origin: center;
-  transition: transform .25s ease-out; /* default — overridden inline during spin */
-}
-
-/* Anticipation: tiny back-rotation before launching */
-.wheel-rotor.anticipating {
-  transform: rotate(-12deg);
-  transition: transform .35s cubic-bezier(.34,1.56,.64,1);
-}
-
-/* Main spin — long, deep deceleration */
-.wheel-rotor.spinning {
-  /* transition is set inline in JS to allow custom duration */
-}
-
-/* Settle bounce after landing */
-.wheel-rotor.settling {
-  transition: transform .5s cubic-bezier(.34,1.5,.64,1);
+  transform-box: view-box;
+  transform-origin: 0 0;
 }
 
 .wheel-label {
