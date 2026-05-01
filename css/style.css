@@ -72,18 +72,46 @@ html, body {
 .player-tile .ptag.zero { color: #364158; }
 
 .bottom-strip {
-  display: flex; gap: 4vw; padding: 1.5vh 2vw; margin-top: 1vh;
-  background: rgba(0,0,0,.4); border-radius: 10px; font-size: 1.3vw;
+  display: flex; gap: 2vw; padding: 1.5vh 2vw; margin-top: 1vh;
+  background: rgba(0,0,0,.55); border-radius: 12px;
+  align-items: stretch;
 }
-.strip-block { display: flex; gap: 1vw; align-items: center; }
+.strip-block { display: flex; flex-direction: column; gap: .8vh; }
+.strip-laws { flex: 2 1 0; min-width: 0; }
+.strip-forbidden { flex: 1 1 0; min-width: 0; }
 .strip-label {
-  font-weight: 800; color: var(--accent); letter-spacing: .15em;
+  font-weight: 800; color: var(--accent); letter-spacing: .14em;
   font-size: 1.1vw;
 }
-#forbidden-strip, #laws-strip { color: var(--fg); }
-#forbidden-strip span, #laws-strip span {
-  display: inline-block; margin-right: .8em;
-  padding: .25em .7em; background: rgba(255,255,255,.06); border-radius: 999px;
+
+.laws-strip {
+  display: flex; gap: 1vw; flex-wrap: wrap; align-items: flex-end;
+}
+.law-thumb {
+  display: flex; flex-direction: column; align-items: center;
+  width: 6.5vw; gap: .4vh;
+}
+.law-thumb img {
+  width: 100%; aspect-ratio: 5/7; object-fit: contain;
+  background: white; border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.5);
+}
+.law-thumb-title {
+  font-size: .9vw; color: var(--fg); text-align: center;
+  letter-spacing: .03em; line-height: 1.2;
+}
+.law-thumb-text { width: auto; min-width: 6vw; padding: .4vh .8vw;
+  background: rgba(255,255,255,.08); border-radius: 6px; }
+.law-thumb-text .law-thumb-title { font-size: 1vw; }
+
+.forbidden-strip {
+  display: flex; flex-wrap: wrap; gap: .5vw; align-content: flex-start;
+}
+.fb-chip {
+  display: inline-block;
+  padding: .35em .9em; background: rgba(220,38,38,.25);
+  border: 1px solid rgba(220,38,38,.5); border-radius: 999px;
+  font-size: 1.2vw; font-weight: 600;
 }
 
 /* WHEEL */
@@ -309,7 +337,10 @@ button.primary { background: var(--green); border-color: var(--green); font-weig
 .laws-list li {
   display: flex; justify-content: space-between; align-items: center;
   padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.06); font-size: 14px;
+  gap: 12px;
 }
+.laws-list .law-name { cursor: pointer; flex: 1; padding: 4px 8px; border-radius: 6px; transition: background .15s; }
+.laws-list .law-name:hover { background: rgba(232,196,104,.15); color: var(--accent); }
 .laws-list .src { font-size: 11px; color: var(--muted); margin-left: 8px; padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,.06); }
 .laws-add { display: flex; gap: 8px; margin-top: 12px; }
 .laws-add select, .forbidden-add input { background: rgba(0,0,0,.3); color: var(--fg); border: 1px solid rgba(255,255,255,.12); padding: 8px; border-radius: 6px; flex: 1; }

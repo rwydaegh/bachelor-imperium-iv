@@ -5,6 +5,8 @@
 import { subscribe, watchConnection } from "./state.js";
 import { CARDS, HEADER_COLOR } from "./cards.js";
 
+const CARD_BY_ID = Object.fromEntries(CARDS.map((c) => [c.id, c]));
+
 const $ = (sel) => document.querySelector(sel);
 
 const screens = {
@@ -104,10 +106,22 @@ function renderScoreboard(state) {
 
 function renderForbiddenAndLaws(state) {
   const fb = state.forbiddenWords || [];
-  $("#forbidden-strip").innerHTML = fb.map((w) => `<span>${escapeHtml(w)}</span>`).join("");
+  $("#forbidden-strip").innerHTML = fb.map((w) => `<span class="fb-chip">${escapeHtml(w)}</span>`).join("");
   const laws = state.activeLaws || [];
-  $("#laws-strip").innerHTML = laws.map((l) => `<span>${escapeHtml(l.title)}</span>`).join("");
+  $("#laws-strip").innerHTML = laws.map((l) => {
+    const card = CARD_BY_ID[l.id];
+    if (card?.image) {
+      return `
+        <div class="law-thumb">
+          <img src="${card.image}" alt="${escapeAttr(l.title)}">
+          <div class="law-thumb-title">${escapeHtml(l.title)}</div>
+        </div>`;
+    }
+    return `<div class="law-thumb law-thumb-text"><div class="law-thumb-title">${escapeHtml(l.title)}</div></div>`;
+  }).join("");
 }
+
+function escapeAttr(s) { return escapeHtml(s); }
 
 function renderCard(card) {
   if (!card) return;

@@ -227,14 +227,21 @@ function renderLaws() {
   const list = $("#laws-list");
   const laws = state?.activeLaws || [];
   list.innerHTML = laws.map((l, i) => `
-    <li>
-      <span>${escapeHtml(l.title)}<span class="src">${escapeHtml(l.source || "")}</span></span>
-      <button data-i="${i}">repeal</button>
+    <li data-i="${i}" data-id="${escapeAttr(l.id)}">
+      <span class="law-name" title="Click to re-project this card">
+        ${escapeHtml(l.title)}<span class="src">${escapeHtml(l.source || "")}</span>
+      </span>
+      <button class="repeal-btn" data-act="repeal">repeal</button>
     </li>`).join("") || "<li><i>No active laws</i></li>";
-  $$("#laws-list button").forEach((b) => b.addEventListener("click", () => {
-    const i = +b.dataset.i;
-    const next = laws.filter((_, j) => j !== i);
-    writeState({ activeLaws: next });
+  $$("#laws-list .repeal-btn").forEach((b) => b.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const i = +b.closest("li").dataset.i;
+    writeState({ activeLaws: laws.filter((_, j) => j !== i) });
+  }));
+  $$("#laws-list .law-name").forEach((el) => el.addEventListener("click", () => {
+    const id = el.closest("li").dataset.id;
+    const card = CARDS.find((c) => c.id === id);
+    if (card) projectCard(card, "card");
   }));
   // Populate add-law dropdown
   const sel = $("#add-law-select");
