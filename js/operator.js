@@ -159,27 +159,42 @@ $("#show-album").addEventListener("click", () => writeState({ projectorMode: "al
 $("#show-scoreboard").addEventListener("click", () => writeState({ projectorMode: "scoreboard" }));
 
 // ============================================================ BROWSER
+// The card list is static, so we render it ONCE on init and only update
+// the "recent" CSS class on subsequent state changes. This avoids tap targets
+// being replaced mid-tap (which used to make taps feel unreliable).
 $$(".tab").forEach((t) => t.addEventListener("click", () => {
   $$(".tab").forEach((x) => x.classList.remove("active"));
   t.classList.add("active");
   activeTab = t.dataset.tab;
-  renderBrowser();
+  buildBrowser();
 }));
-function renderBrowser() {
-  const recent = (state?.recentDraws || []).map((d) => d.cardId);
+function buildBrowser() {
   const cards = cardsByType(activeTab);
   $("#browser-grid").innerHTML = cards.map((c) => `
-    <div class="browser-card ${recent.includes(c.id) ? "recent" : ""}" data-card="${c.id}">
+    <div class="browser-card" data-card="${c.id}">
       <img src="${c.image}" alt="" onerror="this.style.display='none'">
       <div class="bc-name">${escapeHtml(c.title)}</div>
     </div>
   `).join("");
   $$("#browser-grid .browser-card").forEach((el) => {
-    el.addEventListener("click", () => {
+    const handler = (e) => {
+      e.preventDefault();
       const id = el.dataset.card;
       const card = CARDS.find((c) => c.id === id);
-      if (card) fireCard(card);
-    });
+      if (!card) return;
+      el.classList.add("just-tapped");
+      setTimeout(() => el.classList.remove("just-tapped"), 250);
+      fireCard(card);
+    };
+    el.addEventListener("click", handler);
+    el.addEventListener("touchend", handler, { passive: false });
+  });
+  updateBrowserRecent();
+}
+function updateBrowserRecent() {
+  const recent = new Set((state?.recentDraws || []).map((d) => d.cardId));
+  $$("#browser-grid .browser-card").forEach((el) => {
+    el.classList.toggle("recent", recent.has(el.dataset.card));
   });
 }
 
@@ -375,12 +390,13 @@ function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 watchConnection((connected) => {
   $("#conn-dot").classList.toggle("disconnected", !connected);
 });
+let browserBuilt = false;
 subscribe((s) => {
   state = s || defaultState();
   $("#projector-mode-label").textContent = state.projectorMode || "scoreboard";
-  // Sync controls only if user not actively dragging
   syncConfigControls(state);
-  renderBrowser();
+  if (!browserBuilt) { buildBrowser(); browserBuilt = true; }
+  else updateBrowserRecent();
   renderEditor();
   renderLaws();
   renderForbidden();
