@@ -196,9 +196,12 @@ const WHEEL_TIMING = {
   anticipate: 350,
   spin:       4000,
   settle:     500,
-  glow:       1000,
+  glow:       1000,  // glow ring pulses during the hold
+  hold:       1500,  // wheel sits at landed position, contemplative pause
 };
-const WHEEL_TOTAL = WHEEL_TIMING.anticipate + WHEEL_TIMING.spin + WHEEL_TIMING.settle + 200;
+const WHEEL_TOTAL = WHEEL_TIMING.anticipate + WHEEL_TIMING.spin + WHEEL_TIMING.settle + WHEEL_TIMING.hold;
+// Exposed so operator.js can sync its sleep
+window.WHEEL_TOTAL_MS = WHEEL_TOTAL;
 
 function setRotorRotation(rotor, deg, transitionMs, easing) {
   rotor.style.transition = transitionMs > 0
