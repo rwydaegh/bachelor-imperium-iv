@@ -172,30 +172,91 @@ function substitute(body, card) {
 }
 
 let spinning = false;
+// Generate tick marks once
+(function buildWheelTicks() {
+  const g = document.getElementById("wheel-ticks");
+  if (!g) return;
+  for (let i = 0; i < 24; i++) {
+    const a = (i * 15) * Math.PI / 180;
+    const x1 = Math.sin(a) * 96, y1 = -Math.cos(a) * 96;
+    const x2 = Math.sin(a) * 100, y2 = -Math.cos(a) * 100;
+    const isMajor = i % 8 === 0;
+    g.insertAdjacentHTML("beforeend",
+      `<line x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" stroke-width="${isMajor ? 1.5 : 0.6}"/>`);
+  }
+})();
+
+// Multi-stage spin animation:
+// 1. Anticipation: rotor jerks slightly back (0.35s)
+// 2. Main spin: 8 full rotations + lands on target slice (4.0s, deep deceleration)
+// 3. Settle: small overshoot bounce (0.5s)
+// 4. Glow: winning slice ring pulses (1.0s)
+// Total ~ 5.85s
+const WHEEL_TIMING = {
+  anticipate: 350,
+  spin:       4000,
+  settle:     500,
+  glow:       1000,
+};
+const WHEEL_TOTAL = WHEEL_TIMING.anticipate + WHEEL_TIMING.spin + WHEEL_TIMING.settle + 200;
+
 function spinWheel(landingType) {
   if (spinning) return;
   spinning = true;
   showOnly("wheel");
-  const wheel = $("#wheel");
-  const baseAngles = { law: 60, directive: 60, secret: 180, targeted: 300 };
-  const target = baseAngles[landingType] ?? 60;
-  const turns = 4;
-  const finalDeg = 360 * turns + (360 - target);
-  wheel.style.transition = "none";
-  wheel.style.transform = "rotate(0deg)";
-  void wheel.offsetWidth; // reflow
-  wheel.style.transition = "transform 2.4s cubic-bezier(.17,.67,.34,1.01)";
-  wheel.style.transform = `rotate(${finalDeg}deg)`;
-  playSfx("sfx-drumroll");
-  setTimeout(() => playSfx("sfx-bell"), 2300);
+
+  const rotor = document.querySelector(".wheel-rotor");
+  const glow = document.getElementById("wheel-glow");
+  const sectorOf = { law: "public", directive: "public", secret: "secret", targeted: "targeted" };
+  const sector = sectorOf[landingType] || "public";
+  // Sector centers (degrees on the wheel itself, 0 = top, clockwise):
+  // PUBLIC at 60°, SECRET at 180°, TARGETED at 300°
+  const sectorCenter = { public: 60, secret: 180, targeted: 300 }[sector];
+  // To bring a wheel-degree X to the top (under the pointer at 0°), rotate by (360 - X)
+  const turns = 8; // more rotations = more drama
+  const finalDeg = 360 * turns + (360 - sectorCenter);
+  // Overshoot then settle: spin slightly past, then back
+  const overshoot = finalDeg + 8;
+
+  // Reset
+  rotor.classList.remove("anticipating", "spinning", "settling");
+  rotor.style.transition = "none";
+  rotor.style.transform = "rotate(0deg)";
+  glow.classList.add("hidden");
+  glow.classList.remove("public-win", "secret-win", "targeted-win");
+  void rotor.offsetWidth; // reflow
+
+  // Stage 1: anticipation
+  rotor.classList.add("anticipating");
+  rotor.style.transform = "rotate(-12deg)";
+
+  setTimeout(() => {
+    // Stage 2: main spin to overshoot position
+    rotor.classList.remove("anticipating");
+    rotor.classList.add("spinning");
+    rotor.style.transition = `transform ${WHEEL_TIMING.spin}ms cubic-bezier(.10,.62,.20,1.0)`;
+    rotor.style.transform = `rotate(${overshoot}deg)`;
+    playSfx("sfx-drumroll");
+  }, WHEEL_TIMING.anticipate);
+
+  setTimeout(() => {
+    // Stage 3: settle back to exact target with bounce
+    rotor.classList.remove("spinning");
+    rotor.classList.add("settling");
+    rotor.style.transition = `transform ${WHEEL_TIMING.settle}ms cubic-bezier(.34,1.56,.64,1)`;
+    rotor.style.transform = `rotate(${finalDeg}deg)`;
+    playSfx("sfx-bell");
+  }, WHEEL_TIMING.anticipate + WHEEL_TIMING.spin);
+
+  setTimeout(() => {
+    // Stage 4: winning-sector glow
+    glow.classList.remove("hidden");
+    glow.classList.add(`${sector}-win`);
+  }, WHEEL_TIMING.anticipate + WHEEL_TIMING.spin + WHEEL_TIMING.settle);
+
   setTimeout(() => {
     spinning = false;
-    // After wheel: go to card mode (operator may have already moved on; if so respect it)
-    if (lastState?.projectorMode === "wheel_spin") {
-      // No further state change pending; we manually drop to card
-      // (operator will write `card` mode; we just hold here)
-    }
-  }, 2500);
+  }, WHEEL_TOTAL);
 }
 
 function renderWinner(state) {

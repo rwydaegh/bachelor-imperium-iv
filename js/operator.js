@@ -58,7 +58,8 @@ async function projectCard(card, mode) {
       projectorMode: "wheel_spin",
       cardPinned: false,
     });
-    await sleep(2600);
+    // Match WHEEL_TOTAL in projector.js (anticipate + spin + settle + glow ≈ 5.85s)
+    await sleep(6000);
   }
   await writeState({
     currentCard: fullCard,

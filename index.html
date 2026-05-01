@@ -35,11 +35,49 @@
   <div id="wheel-screen" class="screen wheel-screen hidden">
     <div class="wheel-container">
       <div class="wheel-pointer">▼</div>
-      <div id="wheel" class="wheel">
-        <div class="wheel-slice slice-public">PUBLIC</div>
-        <div class="wheel-slice slice-secret">SECRET</div>
-        <div class="wheel-slice slice-targeted">TARGETED</div>
-      </div>
+      <svg id="wheel" class="wheel" viewBox="-110 -110 220 220" xmlns="http://www.w3.org/2000/svg">
+        <!-- Outer rim ring -->
+        <circle cx="0" cy="0" r="105" fill="none" stroke="rgba(255,255,255,.15)" stroke-width="2"/>
+        <!-- 3 sectors (each 120°) -->
+        <g class="wheel-rotor">
+          <!-- PUBLIC: 0–120° (red) -->
+          <path d="M 0,0 L 0,-100 A 100,100 0 0,1 86.6,50 Z" fill="#8B1A1A" data-sector="public"/>
+          <!-- SECRET: 120–240° (gold) -->
+          <path d="M 0,0 L 86.6,50 A 100,100 0 0,1 -86.6,50 Z" fill="#B8860B" data-sector="secret"/>
+          <!-- TARGETED: 240–360° (purple) -->
+          <path d="M 0,0 L -86.6,50 A 100,100 0 0,1 0,-100 Z" fill="#5B21B6" data-sector="targeted"/>
+
+          <!-- Sector dividers -->
+          <line x1="0" y1="0" x2="0" y2="-100" stroke="rgba(255,255,255,.25)" stroke-width=".8"/>
+          <line x1="0" y1="0" x2="86.6" y2="50" stroke="rgba(255,255,255,.25)" stroke-width=".8"/>
+          <line x1="0" y1="0" x2="-86.6" y2="50" stroke="rgba(255,255,255,.25)" stroke-width=".8"/>
+
+          <!-- Tick marks -->
+          <g stroke="rgba(255,255,255,.25)" stroke-width=".6">
+            <!-- 24 ticks every 15° -->
+            <g id="wheel-ticks"></g>
+          </g>
+
+          <!-- Labels — positioned at slice midpoints along radial -->
+          <!-- PUBLIC midpoint at 60°: (sin60*65, -cos60*65) = (56.3, -32.5) -->
+          <text x="56.3" y="-32.5" class="wheel-label" transform="rotate(60 56.3 -32.5)">PUBLIC</text>
+          <!-- SECRET midpoint at 180°: (0, 65) -->
+          <text x="0" y="65" class="wheel-label" transform="rotate(180 0 65)">SECRET</text>
+          <!-- TARGETED midpoint at 300°: (-56.3, -32.5) -->
+          <text x="-56.3" y="-32.5" class="wheel-label" transform="rotate(-60 -56.3 -32.5)">TARGETED</text>
+
+          <!-- Center hub -->
+          <circle cx="0" cy="0" r="14" fill="#0a0e1a" stroke="rgba(255,255,255,.3)" stroke-width="1.5"/>
+          <text x="0" y="4" class="wheel-hub">🛸</text>
+        </g>
+
+        <!-- Highlight overlay for winning sector (revealed after spin) -->
+        <g id="wheel-glow" class="wheel-glow hidden">
+          <circle cx="0" cy="0" r="105" fill="none" stroke="#fff" stroke-width="3" opacity="0">
+            <animate attributeName="opacity" values="0;1;0" dur="1.2s" repeatCount="3"/>
+          </circle>
+        </g>
+      </svg>
     </div>
   </div>
 
