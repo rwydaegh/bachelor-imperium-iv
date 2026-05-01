@@ -150,7 +150,7 @@ html, body {
   background: rgba(0,0,0,.85); padding: 4vh 4vw;
 }
 .card-frame {
-  max-width: 70vh; max-height: 92vh; aspect-ratio: 5/7;
+  width: 50vh; max-width: 90vw; aspect-ratio: 5/7;
   display: flex; align-items: center; justify-content: center;
   animation: card-in .5s ease-out;
 }
@@ -183,12 +183,12 @@ html, body {
 }
 @keyframes eyes-pulse { 0%,100% { opacity: 1; } 50% { opacity: .5; } }
 .eyes-card {
-  max-width: 60vw; max-height: 70vh; padding: 4vh; background: white; color: #111;
-  border-radius: 16px; text-align: center; line-height: 1.4;
+  max-width: 50vw; max-height: 55vh; padding: 3vh 4vh; background: white; color: #111;
+  border-radius: 14px; text-align: center; line-height: 1.4;
   box-shadow: 0 20px 80px rgba(255,255,255,.15);
 }
-.eyes-card .ec-title { font-size: 5vh; font-weight: 800; margin-bottom: 2vh; letter-spacing: .08em; }
-.eyes-card .ec-body { font-size: 3.5vh; line-height: 1.45; }
+.eyes-card .ec-title { font-size: 3.8vh; font-weight: 800; margin-bottom: 1.5vh; letter-spacing: .08em; }
+.eyes-card .ec-body { font-size: 2.6vh; line-height: 1.45; }
 .eyes-card.law-color      { border-top: 1.5vh solid var(--red); }
 .eyes-card.directive-color{ border-top: 1.5vh solid var(--blue); }
 .eyes-card.secret-color   { border-top: 1.5vh solid var(--gold); }
