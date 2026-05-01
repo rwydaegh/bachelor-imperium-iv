@@ -47,7 +47,7 @@ async function spinThenDispatch(card, slice) {
     cardPinned: false,
     recentDraws: [...(state?.recentDraws || []), { ts: Date.now(), type: card.type, cardId: card.id }].slice(-30),
   });
-  await sleep(6000); // matches WHEEL_TOTAL in projector.js
+  await sleep(7400); // matches WHEEL_TOTAL in projector.js (anticipate+spin+settle+hold)
   // After wheel lands, route per category
   if (card.type === "secret" || card.type === "targeted") {
     pendingReveal = { card, substitutions: {} };
