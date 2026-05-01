@@ -10,7 +10,6 @@ export const PLAYERS_DEFAULT = [
   { id: "pieter",  name: "Pieter"  },
   { id: "thomas",  name: "Thomas"  },
   { id: "olivier", name: "Olivier" },
-  { id: "glen",    name: "Glen"    },
 ];
 
 export const CARDS = [

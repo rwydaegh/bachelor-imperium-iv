@@ -17,7 +17,7 @@ export function defaultState() {
     players[p.id] = {
       name: p.name, score: 0,
       forbiddenWords: 0, phubben: 0,
-      freePassUsed: false, present: p.id !== "glen",
+      freePassUsed: false, present: true,
     };
   }
   return {
