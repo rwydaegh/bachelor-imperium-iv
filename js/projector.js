@@ -23,7 +23,7 @@ let lastState = null;
 let albumPhotos = [];
 let albumIdx = 0;
 let albumTimer = null;
-let lastWheelMode = null;
+let lastSpinToken = null;
 
 function showOnly(mode) {
   for (const [key, el] of Object.entries(screens)) {
@@ -38,13 +38,27 @@ function render(state) {
   if (!state) return;
   lastState = state;
   renderScoreboard(state);
-  renderForbiddenAndLaws(state);
+  renderForbiddenAndInPlay(state);
 
   const mode = state.projectorMode || "scoreboard";
 
   if (mode === "wheel_spin") {
-    spinWheel(state.currentCard?.type || "law");
+    // Token-guarded spin: each (mode=wheel_spin, card.id) tuple should trigger
+    // exactly one spin. Resets when mode changes away from wheel_spin so the
+    // next spin is allowed even if the same card id reappears.
+    const cardId = state.currentCard?.id || "_";
+    const token = `wheel:${cardId}`;
+    if (token !== lastSpinToken) {
+      lastSpinToken = token;
+      spinWheel(state.currentCard?.type || "law");
+    } else {
+      // Mid-flight state update (player edit, etc.) — ensure wheel stays visible
+      // without restarting the animation.
+      showOnly("wheel");
+    }
     return;
+  } else {
+    lastSpinToken = null;
   }
   if (mode === "card") {
     renderCard(state.currentCard);
@@ -92,6 +106,9 @@ function renderScoreboard(state) {
     const ph = p.phubben ?? 0;
     return `
       <div class="player-tile ${isLeader ? "leader" : ""} ${isAbsent ? "absent" : ""}">
+        <div class="pface-wrap">
+          <img class="pface" src="photos/players/${id}.png" alt="" onerror="this.style.display='none'">
+        </div>
         <div class="pname">${escapeHtml(p.name || id)}</div>
         <div class="pscore ${score < 0 ? "negative" : ""}">${score >= 0 ? "+" : ""}${score}</div>
         <div class="ptags">
@@ -104,20 +121,33 @@ function renderScoreboard(state) {
   grid.innerHTML = tiles;
 }
 
-function renderForbiddenAndLaws(state) {
+function renderForbiddenAndInPlay(state) {
   const fb = state.forbiddenWords || [];
   $("#forbidden-strip").innerHTML = fb.map((w) => `<span class="fb-chip">${escapeHtml(w)}</span>`).join("");
-  const laws = state.activeLaws || [];
-  $("#laws-strip").innerHTML = laws.map((l) => {
-    const card = CARD_BY_ID[l.id];
+  const inPlay = state.cardsInPlay || [];
+  const TYPE_BACK_ICON = { secret: "🔒", targeted: "🎯" };
+  $("#in-play-strip").innerHTML = inPlay.map((c) => {
+    // Hidden categories: render face-down so the projector audience can see
+    // a card is in play but not which one (operator console shows full info).
+    if (c.type === "secret" || c.type === "targeted") {
+      const icon = TYPE_BACK_ICON[c.type];
+      return `
+        <div class="law-thumb">
+          <div class="card-back ${c.type}-back">
+            <span class="cb-icon">${icon}</span>
+            <span class="cb-label">${c.type.toUpperCase()}</span>
+          </div>
+        </div>`;
+    }
+    const card = CARD_BY_ID[c.id];
     if (card?.image) {
       return `
         <div class="law-thumb">
-          <img src="${card.image}" alt="${escapeAttr(l.title)}">
-          <div class="law-thumb-title">${escapeHtml(l.title)}</div>
+          <img src="${card.image}" alt="${escapeAttr(c.title)}">
+          <div class="law-thumb-title">${escapeHtml(c.title)}</div>
         </div>`;
     }
-    return `<div class="law-thumb law-thumb-text"><div class="law-thumb-title">${escapeHtml(l.title)}</div></div>`;
+    return `<div class="law-thumb law-thumb-text"><div class="law-thumb-title">${escapeHtml(c.title)}</div></div>`;
   }).join("");
 }
 
@@ -171,7 +201,6 @@ function substitute(body, card) {
   return out;
 }
 
-let spinning = false;
 // Generate tick marks once
 (function buildWheelTicks() {
   const g = document.getElementById("wheel-ticks");
@@ -211,8 +240,6 @@ function setRotorRotation(rotor, deg, transitionMs, easing) {
 }
 
 function spinWheel(landingType) {
-  if (spinning) return;
-  spinning = true;
   showOnly("wheel");
 
   const rotor = document.querySelector(".wheel-rotor");
@@ -224,34 +251,36 @@ function spinWheel(landingType) {
   const finalDeg = 360 * turns + (360 - sectorCenter);
   const overshoot = finalDeg + 8;
 
-  // Reset to 0
-  setRotorRotation(rotor, 0, 0);
+  // Hard reset: clear any in-flight transition and snap rotor to 0deg before
+  // starting the next animation. Without this, residual rotation from a prior
+  // spin combines with the new transition and the wheel either jumps mid-frame
+  // or never animates the new arc.
+  rotor.style.transition = "none";
+  rotor.style.transform = "rotate(0deg)";
   glow.classList.add("hidden");
   glow.classList.remove("public-win", "secret-win", "targeted-win");
+  // Force the browser to commit the reset before the next style mutation.
   void rotor.getBoundingClientRect();
 
-  // Stage 1: anticipation
-  setRotorRotation(rotor, -12, WHEEL_TIMING.anticipate, "cubic-bezier(.34,1.56,.64,1)");
+  // Defer to next frame so the reset paints before the anticipate transition starts.
+  requestAnimationFrame(() => {
+    setRotorRotation(rotor, -12, WHEEL_TIMING.anticipate, "cubic-bezier(.34,1.56,.64,1)");
+  });
 
   setTimeout(() => {
-    // Stage 2: main spin
     setRotorRotation(rotor, overshoot, WHEEL_TIMING.spin, "cubic-bezier(.10,.62,.20,1.0)");
     playSfx("sfx-drumroll");
   }, WHEEL_TIMING.anticipate);
 
   setTimeout(() => {
-    // Stage 3: settle bounce
     setRotorRotation(rotor, finalDeg, WHEEL_TIMING.settle, "cubic-bezier(.34,1.56,.64,1)");
     playSfx("sfx-bell");
   }, WHEEL_TIMING.anticipate + WHEEL_TIMING.spin);
 
   setTimeout(() => {
-    // Stage 4: glow
     glow.classList.remove("hidden");
     glow.classList.add(`${sector}-win`);
   }, WHEEL_TIMING.anticipate + WHEEL_TIMING.spin + WHEEL_TIMING.settle);
-
-  setTimeout(() => { spinning = false; }, WHEEL_TOTAL);
 }
 
 function renderWinner(state) {

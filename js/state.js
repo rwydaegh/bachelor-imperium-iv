@@ -23,9 +23,9 @@ export function defaultState() {
   return {
     players,
     forbiddenWords: ["sorry", "Engels taalgebruik", "spel", "spaghetti"],
-    activeLaws: [
-      { id: "law_door_applause", title: "Door Applause", source: "starting" },
-      { id: "law_no_phubben",    title: "No Phubben",    source: "starting" },
+    cardsInPlay: [
+      { id: "law_door_applause", type: "law", title: "Door Applause", source: "starting", uid: "law_door_applause" },
+      { id: "law_no_phubben",    type: "law", title: "No Phubben",    source: "starting", uid: "law_no_phubben" },
     ],
     wheelWeights: { public: 50, secret: 30, targeted: 20 },
     cardDurationSec: 12,
@@ -37,6 +37,19 @@ export function defaultState() {
     recentDraws: [],
     lastUpdate: Date.now(),
   };
+}
+
+// Migrate legacy `activeLaws` → `cardsInPlay`. Idempotent.
+function migrate(s) {
+  if (!s || typeof s !== "object") return s;
+  if (s.activeLaws && !s.cardsInPlay) {
+    s.cardsInPlay = s.activeLaws.map((l, i) => ({
+      id: l.id, type: l.type || "law", title: l.title,
+      source: l.source || "starting", uid: l.uid || `${l.id}-${i}`,
+    }));
+  }
+  if (!s.cardsInPlay) s.cardsInPlay = [];
+  return s;
 }
 
 // ============================================================
@@ -63,7 +76,7 @@ async function fbSubscribe(cb) {
       f.set(f.gameRef, defaultState());
       cb(defaultState());
     } else {
-      cb(v);
+      cb(migrate(v));
     }
   });
 }
@@ -141,11 +154,12 @@ window.addEventListener("storage", (e) => {
 });
 
 function localSubscribe(cb) {
-  localSubs.push(cb);
+  const wrapped = (s) => cb(migrate(s));
+  localSubs.push(wrapped);
   let s = lsRead();
   if (!s) { s = defaultState(); lsWrite(s); }
-  cb(s);
-  return () => { localSubs = localSubs.filter((x) => x !== cb); };
+  cb(migrate(s));
+  return () => { localSubs = localSubs.filter((x) => x !== wrapped); };
 }
 function localWriteState(patch) {
   const s = { ...(lsRead() || defaultState()), ...patch, lastUpdate: Date.now() };

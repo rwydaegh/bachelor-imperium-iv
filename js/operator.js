@@ -3,7 +3,7 @@ import {
   subscribe, writeState, writePlayer, watchConnection,
   resetAll, resetScoresOnly, getStateOnce, defaultState,
 } from "./state.js";
-import { CARDS, cardsByType, publicPile, pickWeighted, HEADER_COLOR } from "./cards.js";
+import { CARDS, cardsByType, publicPile, pickWeighted, HEADER_COLOR, NO_INPLAY_CARDS } from "./cards.js";
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
@@ -74,12 +74,28 @@ async function projectCardNoWheel(card) {
       await writeState({ projectorMode: "scoreboard", currentCard: null });
     }
   }, dur);
-  if (card.type === "law" && card.id !== "law_repeal" && card.id !== "law_add_forbidden_word") {
-    const laws = state?.activeLaws || [];
-    if (!laws.some((l) => l.id === card.id)) {
-      await writeState({ activeLaws: [...laws, { id: card.id, title: card.title, source: "wheel" }] });
-    }
-  }
+  if (card.type === "law" || card.type === "directive") await addToInPlay(card, "wheel");
+}
+
+// Add a card to the cardsInPlay list. Skips meta-action cards that resolve
+// immediately (law_repeal, law_add_forbidden_word). Laws are deduped by id;
+// secrets/targeted/directives can have multiple instances (different uids).
+async function addToInPlay(card, source = "wheel", substitutions = null) {
+  if (NO_INPLAY_CARDS.has(card.id)) return;
+  const inPlay = state?.cardsInPlay || [];
+  if (card.type === "law" && inPlay.some((c) => c.id === card.id)) return;
+  const entry = {
+    uid: `${card.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    id: card.id, type: card.type, title: card.title,
+    source, ts: Date.now(),
+  };
+  if (substitutions && Object.keys(substitutions).length) entry.substitutions = substitutions;
+  await writeState({ cardsInPlay: [...inPlay, entry] });
+}
+
+async function removeFromInPlay(uid) {
+  const inPlay = state?.cardsInPlay || [];
+  await writeState({ cardsInPlay: inPlay.filter((c) => c.uid !== uid) });
 }
 
 async function firePile(slice) {
@@ -104,17 +120,16 @@ async function fireCard(card) {
   await projectCard(card, "card");
 }
 
-async function projectCard(card, mode) {
-  const sliceType = card.type;
-  const wantWheel = state?.wheelAnimation && mode === "card";
-  const fullCard = { ...card };
+async function projectCard(card, mode, opts = {}) {
+  const wantWheel = state?.wheelAnimation && mode === "card" && !opts.skipWheel;
+  const fullCard = card.substitutions ? { ...card } : { ...card };
   if (wantWheel) {
     await writeState({
       currentCard: fullCard,
       projectorMode: "wheel_spin",
       cardPinned: false,
     });
-    // Match WHEEL_TOTAL in projector.js (anticipate + spin + settle + hold ≈ 6.35s + buffer)
+    // Match WHEEL_TOTAL in projector.js (anticipate + spin + settle + hold = 6.35s + buffer)
     await sleep(7400);
   }
   await writeState({
@@ -133,12 +148,10 @@ async function projectCard(card, mode) {
       }
     }, dur);
   }
-  // Auto-add law to active list
-  if (card.type === "law" && card.id !== "law_repeal" && card.id !== "law_add_forbidden_word") {
-    const laws = state?.activeLaws || [];
-    if (!laws.some((l) => l.id === card.id)) {
-      await writeState({ activeLaws: [...laws, { id: card.id, title: card.title, source: "wheel" }] });
-    }
+  // Auto-track in cards-in-play (laws + directives — secrets/targeted are added
+  // when the operator confirms the eyes-closed reveal)
+  if (!opts.skipInPlay && (card.type === "law" || card.type === "directive")) {
+    await addToInPlay(card, "wheel");
   }
 }
 
@@ -191,6 +204,10 @@ $("#project-eyes").addEventListener("click", async () => {
   if (card.type === "targeted" && substitutions.TARGET) {
     const entry = { ts: Date.now(), target: substitutions.TARGET, cardId: card.id, cardTitle: card.title, note: "" };
     await writeState({ targetedHistory: [...(state?.targetedHistory || []), entry].slice(-30) });
+  }
+  // Track in cards-in-play with substitutions
+  if (card.type === "secret" || card.type === "targeted") {
+    await addToInPlay(card, "wheel", substitutions);
   }
   pendingReveal = null;
   $("#staging").classList.add("hidden");
@@ -261,7 +278,10 @@ function renderEditor() {
   const players = Object.entries(state?.players || {});
   tbody.innerHTML = players.map(([id, p]) => `
     <tr class="${p.present === false ? "absent" : ""}" data-id="${id}">
-      <td class="pname">${escapeHtml(p.name)}</td>
+      <td class="pname">
+        <img class="pface-small" src="photos/players/${id}.png" alt="" onerror="this.style.display='none'">
+        ${escapeHtml(p.name)}
+      </td>
       <td><input type="checkbox" data-act="present" ${p.present !== false ? "checked" : ""}></td>
       <td>
         <div class="score-cell">
@@ -294,40 +314,65 @@ function renderEditor() {
   });
 }
 
-// ============================================================ LAWS
-function renderLaws() {
-  const list = $("#laws-list");
-  const laws = state?.activeLaws || [];
-  list.innerHTML = laws.map((l, i) => `
-    <li data-i="${i}" data-id="${escapeAttr(l.id)}">
+// ============================================================ CARDS IN PLAY
+const TYPE_ICON = { law: "⚖", directive: "📜", secret: "🔒", targeted: "🎯" };
+function renderInPlay() {
+  const list = $("#in-play-list");
+  const inPlay = state?.cardsInPlay || [];
+  list.innerHTML = inPlay.map((c) => {
+    const subs = c.substitutions
+      ? Object.entries(c.substitutions).filter(([, v]) => v).map(([k, v]) => `${k}=${v}`).join(", ")
+      : "";
+    return `
+    <li data-uid="${escapeAttr(c.uid)}" data-id="${escapeAttr(c.id)}">
       <span class="law-name" title="Click to re-project this card">
-        ${escapeHtml(l.title)}<span class="src">${escapeHtml(l.source || "")}</span>
+        <span class="card-type-tag ${c.type}">${TYPE_ICON[c.type] || ""} ${c.type}</span>
+        ${escapeHtml(c.title)}
+        ${subs ? `<span class="subs">${escapeHtml(subs)}</span>` : ""}
+        <span class="src">${escapeHtml(c.source || "")}</span>
       </span>
-      <button class="repeal-btn" data-act="repeal">repeal</button>
-    </li>`).join("") || "<li><i>No active laws</i></li>";
-  $$("#laws-list .repeal-btn").forEach((b) => b.addEventListener("click", (e) => {
+      <button class="repeal-btn" data-act="remove">remove</button>
+    </li>`;
+  }).join("") || "<li><i>No cards in play</i></li>";
+  $$("#in-play-list .repeal-btn").forEach((b) => b.addEventListener("click", (e) => {
     e.stopPropagation();
-    const i = +b.closest("li").dataset.i;
-    writeState({ activeLaws: laws.filter((_, j) => j !== i) });
+    const uid = b.closest("li").dataset.uid;
+    removeFromInPlay(uid);
   }));
-  $$("#laws-list .law-name").forEach((el) => el.addEventListener("click", () => {
-    const id = el.closest("li").dataset.id;
+  $$("#in-play-list .law-name").forEach((el) => el.addEventListener("click", () => {
+    const li = el.closest("li");
+    const uid = li.dataset.uid;
+    const id = li.dataset.id;
+    const entry = (state?.cardsInPlay || []).find((c) => c.uid === uid);
     const card = CARDS.find((c) => c.id === id);
-    if (card) projectCard(card, "card");
+    if (!card) return;
+    const reCard = entry?.substitutions ? { ...card, substitutions: entry.substitutions } : card;
+    // Re-project: skip wheel and skip the auto-add-to-inPlay (already in play).
+    // Secrets/targeted re-project as eyes-closed reveal so the original audience stays intact.
+    if (card.type === "secret" || card.type === "targeted") {
+      writeState({ currentCard: { ...reCard }, projectorMode: "eyes_closed", cardPinned: true });
+    } else {
+      projectCard(reCard, "card", { skipWheel: true, skipInPlay: true });
+    }
   }));
-  // Populate add-law dropdown
-  const sel = $("#add-law-select");
-  const candidates = cardsByType("law").filter((c) => !laws.some((l) => l.id === c.id) && c.id !== "law_repeal" && c.id !== "law_add_forbidden_word");
-  sel.innerHTML = `<option value="">Add a law…</option>` + candidates.map((c) => `<option value="${c.id}">${escapeHtml(c.title)}</option>`).join("");
+  // Populate add-card dropdown — all card types except meta
+  const sel = $("#add-card-select");
+  const candidates = CARDS.filter((c) => !NO_INPLAY_CARDS.has(c.id)
+    && !(c.type === "law" && inPlay.some((i) => i.id === c.id)));
+  sel.innerHTML = `<option value="">Add a card…</option>`
+    + ["law", "directive", "secret", "targeted"].map((t) => {
+      const opts = candidates.filter((c) => c.type === t)
+        .map((c) => `<option value="${c.id}">${escapeHtml(c.title)}</option>`).join("");
+      return opts ? `<optgroup label="${t}">${opts}</optgroup>` : "";
+    }).join("");
 }
-$("#add-law-btn").addEventListener("click", () => {
-  const id = $("#add-law-select").value;
+$("#add-card-btn").addEventListener("click", async () => {
+  const id = $("#add-card-select").value;
   if (!id) return;
   const card = CARDS.find((c) => c.id === id);
   if (!card) return;
-  const laws = state?.activeLaws || [];
-  if (laws.some((l) => l.id === id)) return;
-  writeState({ activeLaws: [...laws, { id, title: card.title, source: "manual" }] });
+  await addToInPlay(card, "manual");
+  $("#add-card-select").value = "";
 });
 
 // ============================================================ FORBIDDEN WORDS
@@ -455,7 +500,7 @@ subscribe((s) => {
   if (!browserBuilt) { buildBrowser(); browserBuilt = true; }
   else updateBrowserRecent();
   renderEditor();
-  renderLaws();
+  renderInPlay();
   renderForbidden();
   renderHistory();
 });

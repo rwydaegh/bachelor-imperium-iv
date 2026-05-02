@@ -62,6 +62,15 @@ html, body {
 }
 .player-tile.absent { opacity: .35; }
 .player-tile.leader { border-color: var(--accent); box-shadow: 0 0 24px rgba(232,196,104,.4); }
+.player-tile .pface-wrap {
+  width: 100%; height: 8vh; display: flex; align-items: center; justify-content: center;
+  margin-bottom: .4vh;
+}
+.player-tile .pface {
+  max-height: 100%; max-width: 80%; object-fit: contain;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,.5));
+}
+.player-tile.absent .pface { filter: grayscale(1) brightness(.6); }
 .player-tile .pname { font-size: 2.4vw; font-weight: 700; letter-spacing: .04em; }
 .player-tile .pscore { font-size: 5vw; font-weight: 800; color: var(--accent); line-height: 1; margin: .4vh 0; }
 .player-tile .pscore.negative { color: #ef4444; }
@@ -103,6 +112,25 @@ html, body {
 .law-thumb-text { width: auto; min-width: 6vw; padding: .4vh .8vw;
   background: rgba(255,255,255,.08); border-radius: 6px; }
 .law-thumb-text .law-thumb-title { font-size: 1vw; }
+
+/* Face-down card (secret/targeted in cards-in-play strip) */
+.card-back {
+  width: 100%; aspect-ratio: 5/7; border-radius: 4px;
+  background:
+    repeating-linear-gradient(45deg, rgba(255,255,255,.04) 0 6px, rgba(255,255,255,.08) 6px 12px),
+    linear-gradient(135deg, #1a1326, #2a1a3a);
+  border: 2px solid rgba(255,255,255,.12);
+  box-shadow: 0 2px 8px rgba(0,0,0,.5), inset 0 0 0 4px rgba(0,0,0,.4);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: .4vh;
+}
+.card-back .cb-icon { font-size: 2.4vw; opacity: .85; }
+.card-back .cb-label {
+  font-size: .8vw; letter-spacing: .15em; font-weight: 700;
+  color: rgba(255,255,255,.55);
+}
+.card-back.secret-back   { border-color: rgba(184,134,11,.55); box-shadow: 0 2px 8px rgba(0,0,0,.5), inset 0 0 0 4px rgba(184,134,11,.15); }
+.card-back.targeted-back { border-color: rgba(91,33,182,.55);  box-shadow: 0 2px 8px rgba(0,0,0,.5), inset 0 0 0 4px rgba(91,33,182,.15); }
 
 .forbidden-strip {
   display: flex; flex-wrap: wrap; gap: .5vw; align-content: flex-start;
@@ -357,7 +385,8 @@ button.primary { background: var(--green); border-color: var(--green); font-weig
 .editor-table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .editor-table th { text-align: left; padding: 8px; color: var(--muted); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
 .editor-table td { padding: 8px; border-top: 1px solid rgba(255,255,255,.06); }
-.editor-table .pname { font-weight: 600; }
+.editor-table .pname { font-weight: 600; display: inline-flex; align-items: center; gap: 8px; }
+.editor-table .pface-small { width: 28px; height: 28px; object-fit: contain; vertical-align: middle; }
 .editor-table .absent .pname { color: var(--muted); text-decoration: line-through; }
 .editor-table .score-cell { display: flex; gap: 6px; align-items: center; }
 .editor-table .score-cell .v { min-width: 30px; text-align: center; font-weight: 700; font-size: 16px; color: var(--accent); }
@@ -371,9 +400,18 @@ button.primary { background: var(--green); border-color: var(--green); font-weig
   padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.06); font-size: 14px;
   gap: 12px;
 }
-.laws-list .law-name { cursor: pointer; flex: 1; padding: 4px 8px; border-radius: 6px; transition: background .15s; }
+.laws-list .law-name { cursor: pointer; flex: 1; padding: 4px 8px; border-radius: 6px; transition: background .15s; display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .laws-list .law-name:hover { background: rgba(232,196,104,.15); color: var(--accent); }
 .laws-list .src { font-size: 11px; color: var(--muted); margin-left: 8px; padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,.06); }
+.laws-list .subs { font-size: 11px; color: var(--accent); padding: 2px 6px; border-radius: 4px; background: rgba(232,196,104,.1); }
+.card-type-tag {
+  font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  padding: 2px 6px; border-radius: 4px; color: white;
+}
+.card-type-tag.law       { background: var(--red); }
+.card-type-tag.directive { background: var(--blue); }
+.card-type-tag.secret    { background: var(--gold); color: #2a1a00; }
+.card-type-tag.targeted  { background: var(--purple); }
 .laws-add { display: flex; gap: 8px; margin-top: 12px; }
 .laws-add select, .forbidden-add input { background: rgba(0,0,0,.3); color: var(--fg); border: 1px solid rgba(255,255,255,.12); padding: 8px; border-radius: 6px; flex: 1; }
 

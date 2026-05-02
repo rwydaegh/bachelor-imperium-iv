@@ -112,6 +112,10 @@ export const CARDS = [
     image: "cards/targeted_reverse_mirror.png", weight: 1, tapCount: 2, placeholders: ["TARGET"] },
 ];
 
+// Cards that should NOT auto-track in "cards in play" — meta actions that
+// resolve immediately rather than persisting.
+export const NO_INPLAY_CARDS = new Set(["law_repeal", "law_add_forbidden_word"]);
+
 // Convenience selectors
 export const cardsByType = (type) => CARDS.filter((c) => c.type === type);
 
