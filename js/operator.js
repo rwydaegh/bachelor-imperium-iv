@@ -31,7 +31,7 @@ $("#fire-spin").addEventListener("click", async () => {
   let pile;
   if (slice === "public") pile = publicPile();
   else pile = cardsByType(slice);
-  const recent = (state?.recentDraws || []).slice(-5).map((d) => d.cardId);
+  const recent = (asArray(state?.recentDraws)).slice(-5).map((d) => d.cardId);
   const card = pickWeighted(pile, recent);
   await spinThenDispatch(card, slice);
 });
@@ -45,7 +45,7 @@ async function spinThenDispatch(card, slice) {
     currentCard: { ...card },
     projectorMode: "wheel_spin",
     cardPinned: false,
-    recentDraws: [...(state?.recentDraws || []), { ts: Date.now(), type: card.type, cardId: card.id }].slice(-30),
+    recentDraws: [...(asArray(state?.recentDraws)), { ts: Date.now(), type: card.type, cardId: card.id }].slice(-30),
   });
   await sleep(7400); // matches WHEEL_TOTAL in projector.js (anticipate+spin+settle+hold)
   // After wheel lands, route per category
@@ -103,7 +103,7 @@ async function firePile(slice) {
   let pile;
   if (slice === "public") pile = publicPile();
   else pile = cardsByType(slice);
-  const recent = (state?.recentDraws || []).slice(-5).map((d) => d.cardId);
+  const recent = (asArray(state?.recentDraws)).slice(-5).map((d) => d.cardId);
   const card = pickWeighted(pile, recent);
   await fireCard(card);
 }
@@ -136,7 +136,7 @@ async function projectCard(card, mode, opts = {}) {
     currentCard: fullCard,
     projectorMode: mode,
     cardPinned: false,
-    recentDraws: [...(state?.recentDraws || []), { ts: Date.now(), type: card.type, cardId: card.id }].slice(-30),
+    recentDraws: [...(asArray(state?.recentDraws)), { ts: Date.now(), type: card.type, cardId: card.id }].slice(-30),
   });
   // Auto-dismiss after duration if not pinned & not eyes-closed
   if (mode === "card") {
@@ -185,29 +185,55 @@ function showStaging() {
   `;
   $("#staging").classList.remove("hidden");
   $$('#staging-content [data-ph]').forEach((el) => {
-    el.addEventListener("input", () => {
-      pendingReveal.substitutions[el.dataset.ph] = el.value.trim();
-    });
+    const sync = () => { pendingReveal.substitutions[el.dataset.ph] = el.value.trim(); };
+    el.addEventListener("input", sync);
+    el.addEventListener("change", sync);
   });
 }
 
+// Firebase rejects keys containing . $ # [ ] / — sanitize substitution keys to
+// underscores so e.g. "WRONG NAME" → "WRONG_NAME". Body text uses [WRONG_NAME].
+// Also coerce array-valued state fields back to arrays in case firebase
+// returned them as numeric-keyed objects.
+function sanitizeSubKey(k) { return String(k).replace(/[.$#\[\]\/]/g, "_"); }
+function asArray(v) { return Array.isArray(v) ? v : (v && typeof v === "object" ? Object.values(v) : []); }
+
 $("#project-eyes").addEventListener("click", async () => {
-  if (!pendingReveal) return;
+  console.log("[project-eyes] clicked", { pendingReveal });
+  if (!pendingReveal) {
+    console.warn("[project-eyes] no pendingReveal — staging never opened or already cleared");
+    return;
+  }
   const { card, substitutions } = pendingReveal;
-  const fullCard = { ...card, substitutions };
-  await writeState({
-    currentCard: fullCard,
-    projectorMode: "eyes_closed",
-    cardPinned: true,
-  });
+  // Normalize substitution keys for firebase compatibility.
+  const cleanSubs = {};
+  for (const [k, v] of Object.entries(substitutions || {})) {
+    if (v) cleanSubs[sanitizeSubKey(k)] = v;
+  }
+  const fullCard = { ...card, substitutions: cleanSubs };
+  try {
+    await writeState({
+      currentCard: fullCard,
+      projectorMode: "eyes_closed",
+      cardPinned: true,
+    });
+    console.log("[project-eyes] wrote eyes_closed state", { fullCard });
+  } catch (err) {
+    console.error("[project-eyes] failed to write eyes_closed", err);
+    alert("Failed to project: " + err.message);
+    return;
+  }
   // Log targeted history
-  if (card.type === "targeted" && substitutions.TARGET) {
-    const entry = { ts: Date.now(), target: substitutions.TARGET, cardId: card.id, cardTitle: card.title, note: "" };
-    await writeState({ targetedHistory: [...(state?.targetedHistory || []), entry].slice(-30) });
+  if (card.type === "targeted" && cleanSubs.TARGET) {
+    try {
+      const entry = { ts: Date.now(), target: cleanSubs.TARGET, cardId: card.id, cardTitle: card.title, note: "" };
+      await writeState({ targetedHistory: [...asArray(state?.targetedHistory), entry].slice(-30) });
+    } catch (err) { console.error("[project-eyes] targetedHistory write failed", err); }
   }
   // Track in cards-in-play with substitutions
   if (card.type === "secret" || card.type === "targeted") {
-    await addToInPlay(card, "wheel", substitutions);
+    try { await addToInPlay(card, "wheel", cleanSubs); }
+    catch (err) { console.error("[project-eyes] addToInPlay failed", err); }
   }
   pendingReveal = null;
   $("#staging").classList.add("hidden");
@@ -266,7 +292,7 @@ function buildBrowser() {
   updateBrowserRecent();
 }
 function updateBrowserRecent() {
-  const recent = new Set((state?.recentDraws || []).map((d) => d.cardId));
+  const recent = new Set((asArray(state?.recentDraws)).map((d) => d.cardId));
   $$("#browser-grid .browser-card").forEach((el) => {
     el.classList.toggle("recent", recent.has(el.dataset.card));
   });
